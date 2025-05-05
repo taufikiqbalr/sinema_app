@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Map Management</title>
+
+  <!-- Bootstrap CSS -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+  />
+
+  <style>
+    #map { height: 60vh; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-light bg-light shadow-sm">
+    <div class="container">
+        <a class="navbar-brand" href="/dashboard">
+            <img src="{{ url_for('static', filename='logo.png') }}"
+                 alt="SINEMA"
+                 style="height:24px; margin-right:6px;">
+            SINEMA
+        </a>
+    </div>
+  </nav>
+
+  <div class="container my-4">
+    <h2>Map Management</h2>
+    <div id="map" class="border rounded mb-4"></div>
+
+    <h3>
+      Existing Annotations (<span id="count">0</span>)
+    </h3>
+    <div class="table-responsive">
+      <table class="table table-bordered" id="annotationsTable">
+        <thead class="table-light">
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/';
+    }
+
+    // 1) Define base layers
+    const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    });
+    const satellite = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri'
+      }
+    );
+
+    // 2) Initialize map with the street layer by default
+    const map = L.map('map', {
+      center: [0, 0],
+      zoom: 2,
+      layers: [street] 
+    });
+
+    // 3) Add layer control (Street vs Satellite)
+    L.control.layers({
+      'Street Map': street,
+      'Satellite Imagery': satellite
+    }).addTo(map);
+
+    // 4) FeatureGroup for annotations
+    const drawnItems = new L.FeatureGroup().addTo(map);
+
+    // unified loader
+    async function loadAnnotations() {
+      drawnItems.clearLayers();
+      const tbody = document.querySelector('#annotationsTable tbody');
+      tbody.innerHTML = '';
+      try {
+        const res = await fetch('/annotations', {
+          headers: { 'Authorization': 'Bearer '+token }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const fc = await res.json();
+        document.getElementById('count').textContent = fc.features.length;
+
+        fc.features.forEach(f => {
+          // add to map
+          const layer = L.geoJSON(f).getLayers()[0];
+          layer.bindPopup(f.properties.name);
+          layer.feature = f;
+          drawnItems.addLayer(layer);
+
+          // add to table
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${f.id}</td>
+            <td>${f.properties.name}</td>
+            <td>
+              <button class="btn btn-sm btn-warning me-2"
+                onclick="editAnnotation(${f.id}, ${JSON.stringify(f.properties.name)})">
+                Edit
+              </button>
+              <button class="btn btn-sm btn-danger"
+                onclick="deleteAnnotation(${f.id})">
+                Delete
+              </button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      } catch(err) {
+        console.error('loadAnnotations error', err);
+      }
+    }
+
+    // Delete handler
+    async function deleteAnnotation(id) {
+      if (!confirm(`Delete annotation #${id}?`)) return;
+      try {
+        const res = await fetch(`/annotations/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization':'Bearer '+token }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        console.log(`Deleted annotation ${id}`);
+        await loadAnnotations();
+      } catch(err) {
+        console.error('deleteAnnotation error', err);
+      }
+    }
+
+    // Edit handler (only renames)
+    async function editAnnotation(id, currentName) {
+      const newName = prompt('New name for annotation #'+id, currentName);
+      if (newName===null || newName===currentName) return;
+      try {
+        const res = await fetch(`/annotations/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type':'application/json',
+            'Authorization':'Bearer '+token
+          },
+          body: JSON.stringify({ name: newName })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        console.log(`Renamed annotation ${id} → "${newName}"`);
+        await loadAnnotations();
+      } catch(err) {
+        console.error('editAnnotation error', err);
+      }
+    }
+
+    // Leaflet.draw controls
+    new L.Control.Draw({
+      draw: { polyline:false, circle:false, marker:false, circlemarker:false },
+      edit: { featureGroup: drawnItems }
+    }).addTo(map);
+
+    // Create
+    map.on(L.Draw.Event.CREATED, async e => {
+      const layer = e.layer;
+      const name  = prompt("Name this polygon:","New area") || "Unnamed";
+      const gj    = layer.toGeoJSON();
+      try {
+        const res  = await fetch('/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type':'application/json',
+            'Authorization':'Bearer '+token
+          },
+          body: JSON.stringify({ name, geojson: gj })
+        });
+        const data = await res.json();
+        if (data.id) {
+          console.log("Created annotation id=", data.id);
+          await loadAnnotations();
+        }
+      } catch(err) {
+        console.error('save error', err);
+      }
+    });
+
+    // Update
+    map.on(L.Draw.Event.EDITED, async e => {
+      for (let layer of e.layers) {
+        const f = layer.feature;
+        const gj = layer.toGeoJSON();
+        try {
+          await fetch(`/annotations/${f.id}`, {
+            method:'PUT',
+            headers:{
+              'Content-Type':'application/json',
+              'Authorization':'Bearer '+token
+            },
+            body: JSON.stringify({ name: f.properties.name, geojson: gj })
+          });
+          console.log("Updated annotation id=", f.id);
+        } catch(err) {
+          console.error('update error', err);
+        }
+      }
+      await loadAnnotations();
+    });
+
+    // Delete via draw toolbar
+    map.on(L.Draw.Event.DELETED, async e => {
+      for (let layer of e.layers) {
+        const id = layer.feature.id;
+        try {
+          await fetch(`/annotations/${id}`, {
+            method:'DELETE',
+            headers:{ 'Authorization':'Bearer '+token }
+          });
+          console.log("Deleted annotation id=", id);
+        } catch(err) {
+          console.error('delete error', err);
+        }
+      }
+      await loadAnnotations();
+    });
+
+    // initial load
+    loadAnnotations();
+  </script>
+</body>
+</html>

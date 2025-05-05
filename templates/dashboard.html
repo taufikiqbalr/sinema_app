@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Dashboard</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+    <div class="container">
+        <a class="navbar-brand" href="/dashboard">
+            <img src="{{ url_for('static', filename='logo.png') }}"
+                 alt="SINEMA"
+                 style="height:30px; margin-right:8px;">
+            SINEMA
+        </a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="/map">Manage Map</a></li>
+          <li class="nav-item"><a class="nav-link" href="/users_manage">Manage Users</a></li>
+        </ul>
+        <button class="btn btn-outline-secondary" id="logout">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-5">
+    <h1>Welcome to the SINEMA - Landslide Inventory Mapping</h1>
+    <p class="lead">
+      landslIde iNvEntory MApping application is the application to record your landslide event using polygon lines.
+    </p>
+  </div>
+
+  <script>
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      location.href = '/';
+    });
+  </script>
+</body>
+</html>
