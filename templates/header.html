@@ -1,0 +1,26 @@
+{# templates/header.html #}
+<nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+  <div class="container">
+    <a class="navbar-brand" href="/dashboard">
+      <img src="{{ url_for('static', filename='logo.png') }}"
+           alt="SINEMA"
+           style="height:24px; margin-right:6px;">
+      SINEMA
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#mainNav" aria-controls="mainNav"
+            aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link" href="/map">Manage Map</a></li>
+        <li class="nav-item"><a class="nav-link" href="/provinces_manage">Provinces</a></li>
+        <li class="nav-item"><a class="nav-link" href="/cities_manage">Cities</a></li>
+        <li class="nav-item"><a class="nav-link" href="/place_types_manage">Place Types</a></li>
+        <li class="nav-item"><a class="nav-link" href="/users_manage">Users</a></li>
+      </ul>
+      <button class="btn btn-outline-secondary" id="logout">Logout</button>
+    </div>
+  </div>
+</nav>

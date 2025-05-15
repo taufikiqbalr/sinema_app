@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Place Type – SINEMA{% endblock %}
+
+{% block head %}
+  <!-- Leaflet CSS, Draw CSS… -->
+{% endblock %}
+
+{% block content %}
+  <h2>Manage Place Types</h2>
+  <form id="ptForm" class="row g-3 mb-4">
+    <div class="col-md-8">
+      <input type="text" id="ptName" class="form-control" placeholder="Place type name" required>
+    </div>
+    <div class="col-md-4">
+      <button type="submit" class="btn btn-primary w-100">Add Type</button>
+    </div>
+  </form>
+  <table class="table table-striped">
+    <thead><tr><th>ID</th><th>Name</th><th>Action</th></tr></thead>
+    <tbody id="ptTbody"></tbody>
+  </table>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) location.href='/';
+
+    async function loadPT(){
+      const res = await fetch('/place_types', { headers:{ 'Authorization':'Bearer '+token } });
+      const list = res.ok ? await res.json() : [];
+      const tbody = document.getElementById('ptTbody');
+      tbody.innerHTML = '';
+      list.forEach(pt => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${pt.id}</td>
+          <td>${pt.name}</td>
+          <td>
+            <button class="btn btn-sm btn-warning me-2" onclick="editPT('${pt.id}','${pt.name}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="delPT('${pt.id}')">Delete</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('ptForm').addEventListener('submit', async e=>{
+      e.preventDefault();
+      await fetch('/place_types',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':'Bearer '+token
+        },
+        body: JSON.stringify({ name: document.getElementById('ptName').value })
+      });
+      document.getElementById('ptForm').reset();
+      loadPT();
+    });
+
+    window.editPT = async (id,name) =>{
+      const newName = prompt('New type name:', name);
+      if (!newName) return;
+      await fetch(`/place_types/${id}`,{
+        method:'PUT',
+        headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+token },
+        body: JSON.stringify({ name: newName })
+      });
+      loadPT();
+    };
+    window.delPT = async id => {
+      if (!confirm('Delete this type?')) return;
+      await fetch(`/place_types/${id}`,{ method:'DELETE', headers:{ 'Authorization':'Bearer '+token }});
+      loadPT();
+    };
+
+    loadPT();
+  </script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage City – SINEMA{% endblock %}
+
+{% block head %}
+  <!-- Leaflet CSS, Draw CSS… -->
+{% endblock %}
+
+{% block content %}
+  <h2>Manage Cities</h2>
+
+  <form id="cityForm" class="row g-3 mb-4">
+    <div class="col-md-4">
+      <select id="cityProv" class="form-select" required>
+        <option value="">Select Province</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <input type="text" id="cityName" class="form-control" placeholder="City name" required>
+    </div>
+    <div class="col-md-4">
+      <button type="submit" class="btn btn-primary w-100">Add City</button>
+    </div>
+  </form>
+
+  <table class="table table-striped">
+    <thead><tr><th>ID</th><th>Province</th><th>Name</th><th>Action</th></tr></thead>
+    <tbody id="cityTbody"></tbody>
+  </table>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) location.href='/';
+
+    async function loadProvinces(){
+      const res = await fetch('/provinces', { headers:{ 'Authorization':'Bearer '+token } });
+      const list = res.ok ? await res.json() : [];
+      const sel = document.getElementById('cityProv');
+      sel.innerHTML = '<option value="">Select Province</option>';
+      list.forEach(p => {
+        sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+      });
+    }
+
+    async function loadCities(){
+      const res = await fetch('/cities', { headers:{ 'Authorization':'Bearer '+token } });
+      const list = res.ok ? await res.json() : [];
+      const tbody = document.getElementById('cityTbody');
+      tbody.innerHTML = '';
+      list.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${c.id}</td>
+          <td>${c.province_id}</td>
+          <td>${c.name}</td>
+          <td>
+            <button class="btn btn-sm btn-warning me-2" onclick="editCity('${c.id}','${c.province_id}','${c.name}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="delCity('${c.id}')">Delete</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('cityForm').addEventListener('submit', async e=>{
+      e.preventDefault();
+      await fetch('/cities',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':'Bearer '+token
+        },
+        body: JSON.stringify({
+          province_id: document.getElementById('cityProv').value,
+          name: document.getElementById('cityName').value
+        })
+      });
+      document.getElementById('cityForm').reset();
+      loadCities();
+    });
+
+    window.editCity = async (id,provId,name) =>{
+      const newProv = prompt('Province ID:', provId);
+      const newName = prompt('City name:', name);
+      if (!newProv||!newName) return;
+      await fetch(`/cities/${id}`,{
+        method:'PUT',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':'Bearer '+token
+        },
+        body: JSON.stringify({ province_id: newProv, name: newName })
+      });
+      loadCities();
+    };
+    window.delCity = async id => {
+      if (!confirm('Delete this city?')) return;
+      await fetch(`/cities/${id}`,{ method:'DELETE', headers:{ 'Authorization':'Bearer '+token }});
+      loadCities();
+    };
+
+    loadProvinces().then(loadCities);
+  </script>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Province – SINEMA{% endblock %}
+
+{% block head %}
+  <!-- Leaflet CSS, Draw CSS… -->
+{% endblock %}
+
+{% block content %}
+  <h2>Manage Provinces</h2>
+
+  <form id="provForm" class="row g-3 mb-4">
+    <div class="col-md-8">
+      <input type="text" id="provName" class="form-control" placeholder="Province name" required>
+    </div>
+    <div class="col-md-4">
+      <button type="submit" class="btn btn-primary w-100">Add Province</button>
+    </div>
+  </form>
+
+  <table class="table table-striped">
+    <thead><tr><th>ID</th><th>Name</th><th>Action</th></tr></thead>
+    <tbody id="provTbody"></tbody>
+  </table>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) location.href='/';
+
+    async function loadProvinces(){
+      const res = await fetch('/provinces', { headers:{ 'Authorization':'Bearer '+token } });
+      const list = res.ok ? await res.json() : [];
+      const tbody = document.getElementById('provTbody');
+      tbody.innerHTML = '';
+      list.forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.id}</td>
+          <td>${p.name}</td>
+          <td>
+            <button class="btn btn-sm btn-warning me-2" onclick="editProv('${p.id}','${p.name}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="delProv('${p.id}')">Delete</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('provForm').addEventListener('submit', async e=>{
+      e.preventDefault();
+      await fetch('/provinces',{
+        method:'POST',
+        headers: {
+          'Content-Type':'application/json',
+          'Authorization':'Bearer '+token
+        },
+        body: JSON.stringify({ name: document.getElementById('provName').value })
+      });
+      document.getElementById('provForm').reset();
+      loadProvinces();
+    });
+
+    window.editProv = async (id,name) =>{
+      const newName = prompt('New name:', name);
+      if (!newName) return;
+      await fetch(`/provinces/${id}`, {
+        method:'PUT',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':'Bearer '+token
+        },
+        body: JSON.stringify({ name: newName })
+      });
+      loadProvinces();
+    };
+
+    window.delProv = async id => {
+      if (!confirm('Delete this province?')) return;
+      await fetch(`/provinces/${id}`, {
+        method:'DELETE',
+        headers:{ 'Authorization':'Bearer '+token }
+      });
+      loadProvinces();
+    };
+
+    loadProvinces();
+  </script>
+{% endblock %}

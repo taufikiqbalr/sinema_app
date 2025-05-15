@@ -14,6 +14,7 @@ from flask_jwt_extended import (
     JWTManager, create_access_token,
     jwt_required, get_jwt_identity
 )
+from datetime import datetime
 # import url_for
 
 app = Flask(__name__)
@@ -51,6 +52,9 @@ class Annotation(db.Model):
     __tablename__ = 'annotations'
     id   = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = db.Column(db.String, nullable=False)
+    province_id = db.Column(UUID(as_uuid=True), db.ForeignKey('provinces.id'), nullable=False)
+    city_id     = db.Column(UUID(as_uuid=True), db.ForeignKey('cities.id'), nullable=False)
+    place_type_id = db.Column(UUID(as_uuid=True), db.ForeignKey('place_types.id'), nullable=False)
     occurrence_location  = db.Column(db.String, nullable=False)
     occurrence_date      = db.Column(db.Date,   nullable=False)
     area_condition       = db.Column(db.String, nullable=False)
@@ -77,11 +81,26 @@ class User(db.Model):
 
     def check_password(self, pw):
         return check_password_hash(self.password_hash, pw)
+class Province(db.Model):
+    __tablename__ = 'provinces'
+    id   = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = db.Column(db.String, nullable=False)
+
+class City(db.Model):
+    __tablename__ = 'cities'
+    id            = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    province_id   = db.Column(UUID(as_uuid=True), db.ForeignKey('provinces.id'), nullable=False)
+    name          = db.Column(db.String, nullable=False)
+
+class PlaceType(db.Model):
+    __tablename__ = 'place_types'
+    id   = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = db.Column(db.String, nullable=False)
 
 # ─── Conditional table creation ────────────────────────────────────────────────
 with app.app_context():
      inspector = inspect(db.engine)
-     for model in (Annotation, User, AnnotationPhoto):
+     for model in (Province, City, PlaceType, Annotation, User, AnnotationPhoto):
          if not inspector.has_table(model.__tablename__):
              model.__table__.create(db.engine)
              print(f"🛠 Created missing table '{model.__tablename__}'")
@@ -102,6 +121,18 @@ def map_page():
 @app.route('/users_manage')
 def users_page():
     return render_template('users.html')
+
+@app.route('/provinces_manage')
+def provinces_page():
+    return render_template('provinces.html')
+
+@app.route('/cities_manage')
+def cities_page():
+    return render_template('cities.html')
+
+@app.route('/place_types_manage')
+def place_types_page():
+    return render_template('place_types.html')
 
 # ─── Auth / User APIs ──────────────────────────────────────────────────────────
 @app.route('/register', methods=['GET','POST'])
@@ -152,6 +183,101 @@ def delete_user(uid):
     db.session.delete(u); db.session.commit()
     return jsonify({'status':'deleted'})
 
+# ─── Provinces CRUD APIs ──────────────────────────────────────────────────────
+@app.route('/provinces', methods=['GET'])
+@jwt_required()
+def list_provinces():
+    return jsonify([{'id': str(p.id), 'name': p.name} for p in Province.query.all()])
+
+@app.route('/provinces', methods=['POST'])
+@jwt_required()
+def create_province():
+    data = request.get_json() or {}
+    p = Province(name=data['name'])
+    db.session.add(p); db.session.commit()
+    return jsonify({'id': str(p.id), 'name': p.name}), 201
+
+@app.route('/provinces/<string:pid>', methods=['PUT'])
+@jwt_required()
+def update_province(pid):
+    p = Province.query.get_or_404(pid)
+    data = request.get_json() or {}
+    if 'name' in data:
+        p.name = data['name']
+        db.session.commit()
+    return jsonify({'id': str(p.id), 'name': p.name})
+
+@app.route('/provinces/<string:pid>', methods=['DELETE'])
+@jwt_required()
+def delete_province(pid):
+    p = Province.query.get_or_404(pid)
+    db.session.delete(p); db.session.commit()
+    return jsonify({'status':'deleted'})
+
+# ─── Cities CRUD APIs ──────────────────────────────────────────────────────────
+@app.route('/cities', methods=['GET'])
+@jwt_required()
+def list_cities():
+    return jsonify([
+        {'id': str(c.id), 'name': c.name, 'province_id': str(c.province_id)}
+        for c in City.query.all()
+    ])
+
+@app.route('/cities', methods=['POST'])
+@jwt_required()
+def create_city():
+    data = request.get_json() or {}
+    c = City(name=data['name'], province_id=data['province_id'])
+    db.session.add(c); db.session.commit()
+    return jsonify({'id': str(c.id), 'name': c.name, 'province_id': str(c.province_id)}), 201
+
+@app.route('/cities/<string:cid>', methods=['PUT'])
+@jwt_required()
+def update_city(cid):
+    c = City.query.get_or_404(cid)
+    data = request.get_json() or {}
+    if 'name' in data: c.name = data['name']
+    if 'province_id' in data: c.province_id = data['province_id']
+    db.session.commit()
+    return jsonify({'id': str(c.id), 'name': c.name, 'province_id': str(c.province_id)})
+
+@app.route('/cities/<string:cid>', methods=['DELETE'])
+@jwt_required()
+def delete_city(cid):
+    c = City.query.get_or_404(cid)
+    db.session.delete(c); db.session.commit()
+    return jsonify({'status':'deleted'})
+
+# ─── Place Types CRUD APIs ─────────────────────────────────────────────────────
+@app.route('/place_types', methods=['GET'])
+@jwt_required()
+def list_place_types():
+    return jsonify([{'id': str(pt.id), 'name': pt.name} for pt in PlaceType.query.all()])
+
+@app.route('/place_types', methods=['POST'])
+@jwt_required()
+def create_place_type():
+    data = request.get_json() or {}
+    pt = PlaceType(name=data['name'])
+    db.session.add(pt); db.session.commit()
+    return jsonify({'id': str(pt.id), 'name': pt.name}), 201
+
+@app.route('/place_types/<string:ptid>', methods=['PUT'])
+@jwt_required()
+def update_place_type(ptid):
+    pt = PlaceType.query.get_or_404(ptid)
+    data = request.get_json() or {}
+    if 'name' in data: pt.name = data['name']
+    db.session.commit()
+    return jsonify({'id': str(pt.id), 'name': pt.name})
+
+@app.route('/place_types/<string:ptid>', methods=['DELETE'])
+@jwt_required()
+def delete_place_type(ptid):
+    pt = PlaceType.query.get_or_404(ptid)
+    db.session.delete(pt); db.session.commit()
+    return jsonify({'status':'deleted'})
+
 # ─── Annotation CRUD APIs ──────────────────────────────────────────────────────
 @app.route('/annotations', methods=['GET'])
 @jwt_required()
@@ -179,15 +305,18 @@ def list_annotations():
             'type': 'Feature',
             'id': str(a.id),
             'properties': {
-              'name': a.name,
-              'occurrence_location':  a.occurrence_location,
-              'occurrence_date':      a.occurrence_date.isoformat(),
-              'area_condition':       a.area_condition,
-              'landslide_condition':  a.landslide_condition,
-              'landslide_impact':     a.landslide_impact,
-              'causative_factor':     a.causative_factor,
-              'mechanism':            a.mechanism,
-              'photos': photo_urls
+                'name': a.name,
+                'province_id':   str(a.province_id),
+                'city_id':       str(a.city_id),
+                'place_type_id': str(a.place_type_id),
+                'occurrence_location':  a.occurrence_location,
+                'occurrence_date':      a.occurrence_date.isoformat(),
+                'area_condition':       a.area_condition,
+                'landslide_condition':  a.landslide_condition,
+                'landslide_impact':     a.landslide_impact,
+                'causative_factor':     a.causative_factor,
+                'mechanism':            a.mechanism,
+                'photos': photo_urls
             },
             'geometry': geo
         })
@@ -207,6 +336,9 @@ def save_annotation():
     geom = from_shape(poly, srid=4326)
     ann = Annotation(
       name                 = data.get('name','Unnamed'),
+      province_id         = data['province_id'],
+      city_id             = data['city_id'],
+      place_type_id       = data['place_type_id'],
       geom                 = geom,
       occurrence_location  = data['occurrence_location'],
       occurrence_date      = data['occurrence_date'],
@@ -229,6 +361,7 @@ def update_annotation(aid):
     a = Annotation.query.get_or_404(aid)
     for field in (
       'name','occurrence_location','occurrence_date',
+      'province_id','city_id','place_type_id',
       'area_condition','landslide_condition',
       'landslide_impact','causative_factor','mechanism'
     ):
