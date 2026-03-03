@@ -1,80 +1,158 @@
-{% extends 'base.html' %}
-
-{% block title %}Manage Place Type – SINEMA{% endblock %}
-
-{% block head %}
-  <!-- Leaflet CSS, Draw CSS… -->
-{% endblock %}
-
+﻿{% extends 'base.html' %}
+{% block title %}Place Types  SINEMA{% endblock %}
 {% block content %}
-  <h2>Manage Place Types</h2>
-  <form id="ptForm" class="row g-3 mb-4">
-    <div class="col-md-8">
-      <input type="text" id="ptName" class="form-control" placeholder="Place type name" required>
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="mb-0" style="font-weight:700;"><i class="bi bi-collection-fill me-2 text-success"></i>Manage Place Types</h4>
+    <p class="text-muted mb-0" style="font-size:.85rem;">Define land-use categories for annotations</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-body p-4">
+        <h6 class="card-title mb-3" style="font-weight:600;"><i class="bi bi-plus-circle me-1 text-success"></i>Add Place Type</h6>
+        <form id="ptForm">
+          <div class="mb-3">
+            <label class="form-label small">Type Name</label>
+            <input type="text" id="ptName" class="form-control" placeholder="e.g. Forest, Agriculture" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-plus-lg me-1"></i>Add Type
+          </button>
+        </form>
+      </div>
     </div>
-    <div class="col-md-4">
-      <button type="submit" class="btn btn-primary w-100">Add Type</button>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+          <span style="font-weight:600;font-size:.95rem;"><i class="bi bi-tags me-1"></i>Place Types List</span>
+          <span id="ptCount" class="badge bg-success rounded-pill">0</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr><th style="padding-left:1.25rem;">Type Name</th><th class="text-end" style="padding-right:1.25rem;">Actions</th></tr>
+            </thead>
+            <tbody id="ptTbody">
+              <tr><td colspan="2" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Loading</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  </form>
-  <table class="table table-striped">
-    <thead><tr><th>ID</th><th>Name</th><th>Action</th></tr></thead>
-    <tbody id="ptTbody"></tbody>
-  </table>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2 text-warning"></i>Edit Place Type</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <input type="hidden" id="editId">
+        <div class="mb-3">
+          <label class="form-label small">Type Name</label>
+          <input type="text" id="editName" class="form-control">
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-warning btn-sm" id="btnSaveEdit"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
-  <script>
-    const token = localStorage.getItem('token');
-    if (!token) location.href='/';
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) location.href='/';
 
-    async function loadPT(){
-      const res = await fetch('/place_types', { headers:{ 'Authorization':'Bearer '+token } });
-      const list = res.ok ? await res.json() : [];
-      const tbody = document.getElementById('ptTbody');
-      tbody.innerHTML = '';
-      list.forEach(pt => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${pt.id}</td>
-          <td>${pt.name}</td>
-          <td>
-            <button class="btn btn-sm btn-warning me-2" onclick="editPT('${pt.id}','${pt.name}')">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="delPT('${pt.id}')">Delete</button>
-          </td>`;
-        tbody.appendChild(tr);
-      });
+  const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+  const typeColors = ['primary','success','info','warning','danger','secondary','dark'];
+
+  async function loadPT(){
+    const res = await fetch('/place_types', { headers:{ 'Authorization':'Bearer '+token } });
+    const list = res.ok ? await res.json() : [];
+    const tbody = document.getElementById('ptTbody');
+    document.getElementById('ptCount').textContent = list.length;
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-4">No place types yet. Add one above.</td></tr>';
+      return;
     }
-
-    document.getElementById('ptForm').addEventListener('submit', async e=>{
-      e.preventDefault();
-      await fetch('/place_types',{
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'Authorization':'Bearer '+token
-        },
-        body: JSON.stringify({ name: document.getElementById('ptName').value })
-      });
-      document.getElementById('ptForm').reset();
-      loadPT();
+    tbody.innerHTML = '';
+    list.forEach((pt, idx) => {
+      const color = typeColors[idx % typeColors.length];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="padding-left:1.25rem;">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-${color}" style="font-size:.75rem;padding:.35em .65em;">${pt.name.charAt(0).toUpperCase()}</span>
+            <span style="font-weight:500;">${pt.name}</span>
+          </div>
+        </td>
+        <td class="text-end" style="padding-right:1.25rem;">
+          <button class="btn btn-sm btn-outline-warning me-1" onclick="openEdit('${pt.id}','${pt.name.replace(/'/g,"\\'")}')">
+            <i class="bi bi-pencil"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger" onclick="delPT('${pt.id}')">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </td>`;
+      tbody.appendChild(tr);
     });
+  }
 
-    window.editPT = async (id,name) =>{
-      const newName = prompt('New type name:', name);
-      if (!newName) return;
-      await fetch(`/place_types/${id}`,{
-        method:'PUT',
-        headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+token },
-        body: JSON.stringify({ name: newName })
-      });
-      loadPT();
-    };
-    window.delPT = async id => {
-      if (!confirm('Delete this type?')) return;
-      await fetch(`/place_types/${id}`,{ method:'DELETE', headers:{ 'Authorization':'Bearer '+token }});
-      loadPT();
-    };
+  document.getElementById('ptForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving';
+    const res = await fetch('/place_types',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify({ name: document.getElementById('ptName').value })
+    });
+    btn.disabled = false; btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add Type';
+    if (res.ok) { document.getElementById('ptForm').reset(); showToast('Place type added'); loadPT(); }
+    else showToast('Failed to add type', 'danger');
+  });
 
-    loadPT();
-  </script>
+  window.openEdit = (id, name) => {
+    document.getElementById('editId').value = id;
+    document.getElementById('editName').value = name;
+    editModal.show();
+  };
+
+  document.getElementById('btnSaveEdit').addEventListener('click', async () => {
+    const id = document.getElementById('editId').value;
+    const name = document.getElementById('editName').value.trim();
+    if (!name) return;
+    const res = await fetch(`/place_types/${id}`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body: JSON.stringify({ name })
+    });
+    editModal.hide();
+    if (res.ok) { showToast('Place type updated'); loadPT(); }
+    else showToast('Update failed', 'danger');
+  });
+
+  window.delPT = async id => {
+    if (!confirm('Delete this place type?')) return;
+    const res = await fetch(`/place_types/${id}`,{ method:'DELETE', headers:{ 'Authorization':'Bearer '+token }});
+    if (res.ok) { showToast('Place type deleted', 'warning'); loadPT(); }
+    else showToast('Delete failed', 'danger');
+  };
+
+  loadPT();
+</script>
 {% endblock %}

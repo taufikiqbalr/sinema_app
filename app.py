@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, abort, url_for
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect
+from blockchain import Blockchain, Block
 import os
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
@@ -14,15 +15,16 @@ from flask_jwt_extended import (
     JWTManager, create_access_token,
     jwt_required, get_jwt_identity
 )
-from datetime import datetime
+from datetime import datetime, timedelta
 # import url_for
 
 app = Flask(__name__)
 
 # ─── Config ────────────────────────────────────────────────────────────────────
-app.config['SQLALCHEMY_DATABASE_URI']       = 'postgresql://postgres:root@localhost/mymapdb'
+app.config['SQLALCHEMY_DATABASE_URI']       = 'postgresql://postgres:postgres@localhost/sinema_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY']                = 'rahasianegara'
+app.config['JWT_ACCESS_TOKEN_EXPIRES']      = timedelta(minutes=15)
 
 db  = SQLAlchemy(app)
 jwt = JWTManager(app)
@@ -97,13 +99,68 @@ class PlaceType(db.Model):
     id   = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = db.Column(db.String, nullable=False)
 
+class BlockRecord(db.Model):
+    """Persists every mined blockchain block to PostgreSQL."""
+    __tablename__ = 'blockchain_blocks'
+    id            = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    blk_index     = db.Column(db.Integer, nullable=False, unique=True)
+    timestamp     = db.Column(db.Float,   nullable=False)
+    data          = db.Column(db.JSON,    nullable=False)   # full transaction dict
+    previous_hash = db.Column(db.String,  nullable=False)
+    nonce         = db.Column(db.Integer, nullable=False)
+    block_hash    = db.Column(db.String,  nullable=False)
+
 # ─── Conditional table creation ────────────────────────────────────────────────
 with app.app_context():
      inspector = inspect(db.engine)
-     for model in (Province, City, PlaceType, Annotation, User, AnnotationPhoto):
+     for model in (Province, City, PlaceType, Annotation, User, AnnotationPhoto, BlockRecord):
          if not inspector.has_table(model.__tablename__):
              model.__table__.create(db.engine)
              print(f"🛠 Created missing table '{model.__tablename__}'")
+
+
+# ─── Blockchain helpers ────────────────────────────────────────────────────────
+def _load_chain() -> Blockchain:
+    """Rebuild the in-memory Blockchain from stored BlockRecord rows."""
+    bc = Blockchain()
+    rows = BlockRecord.query.order_by(BlockRecord.blk_index).all()
+    bc.load([
+        {
+            "index":         r.blk_index,
+            "timestamp":     r.timestamp,
+            "data":          r.data,
+            "previous_hash": r.previous_hash,
+            "nonce":         r.nonce,
+            "hash":          r.block_hash,
+        }
+        for r in rows
+    ])
+    return bc
+
+
+def _persist_block(block: Block) -> None:
+    """Save a freshly mined Block to the database."""
+    rec = BlockRecord(
+        blk_index     = block.index,
+        timestamp     = block.timestamp,
+        data          = block.data,
+        previous_hash = block.previous_hash,
+        nonce         = block.nonce,
+        block_hash    = block.hash,
+    )
+    db.session.add(rec)
+    db.session.commit()
+    print(f"⛏  Mined block #{block.index} hash={block.hash[:16]}… nonce={block.nonce}")
+
+
+def blockchain_record(action: str, annotation_id: str, payload: dict) -> None:
+    """High-level helper: load chain, mine a new block, persist it."""
+    bc = _load_chain()
+    genesis = bc.ensure_genesis()
+    if genesis:
+        _persist_block(genesis)
+    block = bc.add_block(action, annotation_id, payload)
+    _persist_block(block)
 
 # ─── Page Routes ───────────────────────────────────────────────────────────────
 @app.route('/')
@@ -133,6 +190,10 @@ def cities_page():
 @app.route('/place_types_manage')
 def place_types_page():
     return render_template('place_types.html')
+
+@app.route('/blockchain_manage')
+def blockchain_page():
+    return render_template('blockchain.html')
 
 # ─── Auth / User APIs ──────────────────────────────────────────────────────────
 @app.route('/register', methods=['GET','POST'])
@@ -164,6 +225,15 @@ def login():
     token = create_access_token(identity=str(u.id))
     print(f"✅ Login success for user id={u.id}")
     return jsonify({'access_token': token})
+
+@app.route('/refresh_token', methods=['POST'])
+@jwt_required()
+def refresh_token():
+    """Issue a fresh access token for the currently authenticated user."""
+    identity = get_jwt_identity()
+    new_token = create_access_token(identity=identity)
+    print(f"🔄 Token refreshed for user_id={identity}")
+    return jsonify({'access_token': new_token})
 
 @app.route('/users', methods=['GET'])
 @jwt_required()
@@ -350,6 +420,23 @@ def save_annotation():
     )
     db.session.add(ann); db.session.commit()
     print(f"✅ Saved annotation id={ann.id}")
+    blockchain_record(
+        action        = "INSERT",
+        annotation_id = str(ann.id),
+        payload       = {
+            'name':                ann.name,
+            'province_id':         str(ann.province_id),
+            'city_id':             str(ann.city_id),
+            'place_type_id':       str(ann.place_type_id),
+            'occurrence_location': ann.occurrence_location,
+            'occurrence_date':     ann.occurrence_date.isoformat(),
+            'area_condition':      ann.area_condition,
+            'landslide_condition': ann.landslide_condition,
+            'landslide_impact':    ann.landslide_impact,
+            'causative_factor':    ann.causative_factor,
+            'mechanism':           ann.mechanism,
+        },
+    )
     return jsonify({'status':'ok','id':ann.id})
 
 @app.route('/annotations/<string:aid>', methods=['PUT'])
@@ -372,6 +459,23 @@ def update_annotation(aid):
         a.geom = from_shape(poly, srid=4326)
     db.session.commit()
     print(f"✅ Updated annotation id={aid}")
+    blockchain_record(
+        action        = "UPDATE",
+        annotation_id = str(aid),
+        payload       = {
+            'name':                a.name,
+            'province_id':         str(a.province_id),
+            'city_id':             str(a.city_id),
+            'place_type_id':       str(a.place_type_id),
+            'occurrence_location': a.occurrence_location,
+            'occurrence_date':     a.occurrence_date.isoformat() if a.occurrence_date else None,
+            'area_condition':      a.area_condition,
+            'landslide_condition': a.landslide_condition,
+            'landslide_impact':    a.landslide_impact,
+            'causative_factor':    a.causative_factor,
+            'mechanism':           a.mechanism,
+        },
+    )
     return jsonify({'status':'ok'})
 
 @app.route('/annotations/<string:aid>', methods=['DELETE'])
@@ -380,8 +484,22 @@ def delete_annotation(aid):
     identity = get_jwt_identity()
     print(f"🗑 delete_annotation {aid} by user_id={identity}")
     a = Annotation.query.get_or_404(aid)
+    snapshot = {
+        'name':                a.name,
+        'province_id':         str(a.province_id),
+        'city_id':             str(a.city_id),
+        'place_type_id':       str(a.place_type_id),
+        'occurrence_location': a.occurrence_location,
+        'occurrence_date':     a.occurrence_date.isoformat() if a.occurrence_date else None,
+        'area_condition':      a.area_condition,
+        'landslide_condition': a.landslide_condition,
+        'landslide_impact':    a.landslide_impact,
+        'causative_factor':    a.causative_factor,
+        'mechanism':           a.mechanism,
+    }
     db.session.delete(a); db.session.commit()
     print(f"✅ Deleted annotation id={aid}")
+    blockchain_record(action="DELETE", annotation_id=str(aid), payload=snapshot)
     return jsonify({'status':'deleted'})
 
 # ─── New endpoint: upload photos ─────────────────────────────────────────────
@@ -407,6 +525,20 @@ def upload_photos(aid):
     # return URLs for client to render if desired
     urls = [ url_for('static', filename=f'uploads/{fn}') for fn in saved ]
     return jsonify({ 'uploaded': urls }), 201
+
+# ─── Blockchain API ───────────────────────────────────────────────────────────
+@app.route('/blockchain_chain', methods=['GET'])
+@jwt_required()
+def get_blockchain():
+    """Return the full blockchain as JSON, plus a validity flag."""
+    bc = _load_chain()
+    bc.ensure_genesis()   # no-op if chain is populated
+    return jsonify({
+        'valid':  bc.is_valid(),
+        'length': len(bc.chain),
+        'chain':  [b.to_dict() for b in bc.chain],
+    })
+
 
 if __name__ == '__main__':
     app.run(debug=True)

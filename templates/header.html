@@ -1,11 +1,71 @@
 {# templates/header.html #}
-<nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+<style>
+  .app-navbar {
+    background: linear-gradient(135deg, #1b2a4a 0%, #1e3a6e 60%, #0f4a3a 100%);
+    padding: .5rem 0;
+    box-shadow: 0 2px 16px rgba(0,0,0,.22);
+  }
+  .app-navbar .navbar-brand {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #fff !important;
+    letter-spacing: .02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .app-navbar .navbar-brand img { height: 28px; filter: brightness(0) invert(1); }
+  .app-navbar .nav-link {
+    color: rgba(255,255,255,.7) !important;
+    font-size: .85rem;
+    font-weight: 500;
+    padding: .45rem .75rem !important;
+    border-radius: 7px;
+    transition: background .18s, color .18s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .app-navbar .nav-link:hover,
+  .app-navbar .nav-link.active { color: #fff !important; background: rgba(255,255,255,.12); }
+  .app-navbar .navbar-toggler { border-color: rgba(255,255,255,.3); }
+  .app-navbar .navbar-toggler-icon {
+    filter: invert(1);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255,255,255,.7%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+  }
+  .app-navbar .btn-logout {
+    font-size: .82rem;
+    font-weight: 600;
+    padding: .35rem 1rem;
+    border-radius: 20px;
+    border: 1.5px solid rgba(255,255,255,.35);
+    color: rgba(255,255,255,.85);
+    background: transparent;
+    transition: all .18s;
+  }
+  .app-navbar .btn-logout:hover {
+    background: rgba(255,255,255,.15);
+    border-color: rgba(255,255,255,.6);
+    color: #fff;
+  }
+  /* Active link highlight via path */
+  .app-navbar[data-path="/map"]              a[href="/map"],
+  .app-navbar[data-path="/provinces_manage"] a[href="/provinces_manage"],
+  .app-navbar[data-path="/cities_manage"]    a[href="/cities_manage"],
+  .app-navbar[data-path="/place_types_manage"] a[href="/place_types_manage"],
+  .app-navbar[data-path="/users_manage"]     a[href="/users_manage"],
+  .app-navbar[data-path="/blockchain_manage"] a[href="/blockchain_manage"],
+  .app-navbar[data-path="/dashboard"]        a[href="/dashboard"] {
+    color: #fff !important;
+    background: rgba(255,255,255,.16);
+  }
+</style>
+
+<nav class="navbar navbar-expand-lg app-navbar" id="appNavbar">
   <div class="container">
     <a class="navbar-brand" href="/dashboard">
-      <img src="{{ url_for('static', filename='logo.png') }}"
-           alt="SINEMA"
-           style="height:24px; margin-right:6px;">
-      SINEMA
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="SINEMA">
+      SINEMACHAIN
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
             data-bs-target="#mainNav" aria-controls="mainNav"
@@ -13,14 +73,39 @@
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="mainNav">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="/map">Manage Map</a></li>
-        <li class="nav-item"><a class="nav-link" href="/provinces_manage">Provinces</a></li>
-        <li class="nav-item"><a class="nav-link" href="/cities_manage">Cities</a></li>
-        <li class="nav-item"><a class="nav-link" href="/place_types_manage">Place Types</a></li>
-        <li class="nav-item"><a class="nav-link" href="/users_manage">Users</a></li>
+      <ul class="navbar-nav me-auto gap-1">
+        <li class="nav-item">
+          <a class="nav-link" href="/dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/map"><i class="bi bi-map"></i>Map</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/provinces_manage"><i class="bi bi-flag"></i>Provinces</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/cities_manage"><i class="bi bi-building"></i>Cities</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/place_types_manage"><i class="bi bi-collection"></i>Place Types</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/users_manage"><i class="bi bi-people"></i>Users</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/blockchain_manage"><i class="bi bi-link-45deg"></i>Blockchain</a>
+        </li>
       </ul>
-      <button class="btn btn-outline-secondary" id="logout">Logout</button>
+      <button class="btn-logout" id="logout">
+        <i class="bi bi-box-arrow-right me-1"></i>Logout
+      </button>
     </div>
   </div>
 </nav>
+<script>
+  // Highlight active nav link
+  (function(){
+    const nav = document.getElementById('appNavbar');
+    if (nav) nav.setAttribute('data-path', location.pathname);
+  })();
+</script>

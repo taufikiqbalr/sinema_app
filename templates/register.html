@@ -1,74 +1,280 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <title>Register</title>
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Register  SINEMA</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      min-height: 100vh;
+      background: #f0f2f7;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .auth-wrap {
+      display: flex; width: 100%; max-width: 900px; min-height: 540px;
+      border-radius: 24px; overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.18); margin: 1.5rem;
+      animation: fadeUp .45s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(22px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    /*  Right decorative panel (flipped  form on left)  */
+    .auth-panel {
+      flex: 0 0 42%; order: 2;
+      background: linear-gradient(160deg, #0f6e5e 0%, #1e3a6e 50%, #1b2a4a 100%);
+      color: #fff; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 3rem 2.5rem; position: relative; overflow: hidden;
+    }
+    .auth-panel::before {
+      content:''; position:absolute; width:300px; height:300px; border-radius:50%;
+      background:rgba(255,255,255,.05); bottom:-90px; left:-70px;
+    }
+    .auth-panel::after {
+      content:''; position:absolute; width:160px; height:160px; border-radius:50%;
+      background:rgba(255,255,255,.07); top:-40px; right:-30px;
+    }
+    .auth-panel img { max-height:72px; z-index:1; margin-bottom:1.6rem; }
+    .auth-panel h2 { font-weight:800; font-size:1.55rem; z-index:1; text-align:center; margin-bottom:.5rem; }
+    .auth-panel p  { font-size:.83rem; opacity:.65; z-index:1; text-align:center; line-height:1.6; margin-bottom:0; }
+    .feature-list  { list-style:none; padding:0; margin:1.3rem 0 0; z-index:1; }
+    .feature-list li {
+      font-size:.78rem; opacity:.75; padding:.28rem 0;
+      display:flex; align-items:center; gap:.5rem;
+    }
+    .feature-list li i { font-size:.85rem; opacity:.9; }
+    /*  Left form panel  */
+    .auth-form {
+      flex:1; order:1; background:#fff; display:flex; flex-direction:column;
+      justify-content:center; padding:3rem;
+    }
+    .auth-form h3 { font-weight:800; font-size:1.45rem; color:#1b2a4a; margin-bottom:.3rem; }
+    .auth-form .sub { font-size:.83rem; color:#8a93a4; margin-bottom:2rem; }
+    .input-group-icon { position:relative; }
+    .input-group-icon .field-icon {
+      position:absolute; left:.9rem; top:50%; transform:translateY(-50%);
+      color:#aab0bc; font-size:1rem; z-index:5; pointer-events:none;
+    }
+    .input-group-icon input {
+      padding-left:2.5rem !important; border-radius:10px !important;
+      border:1.5px solid #dde2ec; background:#f8f9fc;
+      transition:border-color .2s, box-shadow .2s; height:46px; font-size:.9rem;
+    }
+    .input-group-icon input:focus {
+      border-color:#059669; box-shadow:0 0 0 3px rgba(5,150,105,.12); background:#fff;
+    }
+    .input-group-icon input.is-invalid {
+      border-color:#dc3545; box-shadow:0 0 0 3px rgba(220,53,69,.1);
+    }
+    .toggle-pw {
+      position:absolute; right:.85rem; top:50%; transform:translateY(-50%);
+      cursor:pointer; color:#aab0bc; z-index:5; background:none; border:none; padding:0;
+    }
+    .toggle-pw:hover { color:#059669; }
+    /* strength meter */
+    .pw-strength { height:4px; border-radius:2px; margin-top:.4rem; background:#eef0f4; overflow:hidden; }
+    .pw-strength-fill { height:100%; border-radius:2px; width:0; transition:width .3s, background .3s; }
+    .pw-hint { font-size:.72rem; color:#a0aab4; margin-top:.25rem; }
+    .btn-auth {
+      height:46px; border-radius:10px; font-weight:700; font-size:.92rem;
+      background:linear-gradient(135deg,#047857,#059669); border:none;
+      letter-spacing:.3px; transition:opacity .2s, transform .15s;
+    }
+    .btn-auth:hover { opacity:.9; transform:translateY(-1px); }
+    .btn-auth:active { transform:translateY(0); }
+    #regAlert { border-radius:10px; font-size:.84rem; padding:.6rem .9rem; display:none; }
+    #regSuccess { border-radius:10px; font-size:.84rem; padding:.6rem .9rem; display:none; }
+    .divider {
+      display:flex; align-items:center; gap:.75rem;
+      margin:1.4rem 0 1.2rem; color:#c2c9d6; font-size:.75rem;
+    }
+    .divider::before, .divider::after { content:''; flex:1; border-top:1px solid #e8ebf2; }
+    .auth-link { font-size:.83rem; text-align:center; color:#8a93a4; }
+    .auth-link a { color:#059669; font-weight:600; text-decoration:none; }
+    .auth-link a:hover { text-decoration:underline; }
+    @media (max-width:640px) {
+      .auth-panel { display:none; }
+      .auth-form  { padding:2.5rem 2rem; order:1; }
+      .auth-wrap  { border-radius:18px; }
+    }
+  </style>
 </head>
-<body class="bg-light">
-  <div class="container vh-100 d-flex justify-content-center align-items-center">
-    <div class="card shadow-sm w-100" style="max-width:400px">
-      <div class="card-body">
-        <!-- LOGO -->
-        <div class="text-center mb-3">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="SINEMA Logo" style="max-height:80px;">
-        </div>
-        <h2 class="card-title text-center mb-4">Create Account</h2>
-        <form id="registerForm">
-          <div class="mb-3">
-            <label for="username" class="form-label">Username</label>
-            <input
-              type="text"
-              class="form-control"
-              id="username"
-              placeholder="Choose a username"
-              required
-            />
-          </div>
-          <div class="mb-4">
-            <label for="password" class="form-label">Password</label>
-            <input
-              type="password"
-              class="form-control"
-              id="password"
-              placeholder="Choose a password"
-              required
-            />
-          </div>
-          <button type="submit" class="btn btn-success w-100">Register</button>
-        </form>
-        <p class="text-center mt-3">
-          Already have an account?
-          <a href="/">Login here</a>
-        </p>
+<body>
+  <div class="auth-wrap">
+    <!-- Form panel (left) -->
+    <div class="auth-form">
+      <h3>Create Account</h3>
+      <p class="sub">Join SINEMA to start mapping and monitoring</p>
+
+      <div class="alert alert-danger" id="regAlert" role="alert">
+        <i class="bi bi-exclamation-circle me-1"></i>
+        <span id="regAlertMsg">Registration failed.</span>
       </div>
+      <div class="alert alert-success" id="regSuccess" role="alert">
+        <i class="bi bi-check-circle me-1"></i> Account created! Redirecting to login
+      </div>
+
+      <form id="registerForm" novalidate>
+        <div class="mb-3">
+          <label for="username" class="form-label fw-semibold" style="font-size:.85rem;color:#3d4a5c;">Username</label>
+          <div class="input-group-icon">
+            <i class="bi bi-person field-icon"></i>
+            <input type="text" class="form-control" id="username"
+                   placeholder="Choose a username" required autocomplete="username"
+                   minlength="3"/>
+          </div>
+          <div class="invalid-feedback" id="usernameFeedback" style="font-size:.78rem;"></div>
+        </div>
+
+        <div class="mb-3">
+          <label for="password" class="form-label fw-semibold" style="font-size:.85rem;color:#3d4a5c;">Password</label>
+          <div class="input-group-icon">
+            <i class="bi bi-lock field-icon"></i>
+            <input type="password" class="form-control" id="password"
+                   placeholder="Choose a strong password" required autocomplete="new-password"
+                   minlength="6"/>
+            <button type="button" class="toggle-pw" id="togglePw" tabindex="-1">
+              <i class="bi bi-eye" id="togglePwIcon"></i>
+            </button>
+          </div>
+          <div class="pw-strength mt-1">
+            <div class="pw-strength-fill" id="pwStrengthFill"></div>
+          </div>
+          <div class="pw-hint" id="pwHint">Minimum 6 characters</div>
+        </div>
+
+        <div class="mb-4">
+          <label for="confirmPassword" class="form-label fw-semibold" style="font-size:.85rem;color:#3d4a5c;">Confirm Password</label>
+          <div class="input-group-icon">
+            <i class="bi bi-lock-fill field-icon"></i>
+            <input type="password" class="form-control" id="confirmPassword"
+                   placeholder="Repeat your password" required autocomplete="new-password"/>
+          </div>
+          <div class="invalid-feedback" id="confirmFeedback" style="font-size:.78rem;display:none;"></div>
+        </div>
+
+        <button type="submit" class="btn btn-auth btn-success w-100" id="regBtn">
+          <span id="regBtnText"><i class="bi bi-person-plus me-1"></i>Create Account</span>
+          <span id="regBtnSpinner" class="d-none">
+            <span class="spinner-border spinner-border-sm me-1"></span> Creating
+          </span>
+        </button>
+      </form>
+
+      <div class="divider">or</div>
+      <p class="auth-link">Already have an account? <a href="/">Sign in</a></p>
+    </div>
+
+    <!-- Decorative panel (right) -->
+    <div class="auth-panel">
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="SINEMA Logo"/>
+      <h2>Join SINEMA</h2>
+      <p>Start annotating landslide events with precision and security</p>
+      <ul class="feature-list">
+        <li><i class="bi bi-check-circle-fill"></i> Draw polygon annotations on the map</li>
+        <li><i class="bi bi-check-circle-fill"></i> Blockchain-recorded audit trail</li>
+        <li><i class="bi bi-check-circle-fill"></i> Province &amp; city classification</li>
+        <li><i class="bi bi-check-circle-fill"></i> Attach photos to each event</li>
+        <li><i class="bi bi-check-circle-fill"></i> Analytics dashboard &amp; charts</li>
+      </ul>
     </div>
   </div>
 
   <script>
-    document.getElementById('registerForm').addEventListener('submit', e => {
+    //  Password visibility toggle 
+    document.getElementById('togglePw').addEventListener('click', () => {
+      const pw   = document.getElementById('password');
+      const icon = document.getElementById('togglePwIcon');
+      if (pw.type === 'password') { pw.type = 'text'; icon.className = 'bi bi-eye-slash'; }
+      else { pw.type = 'password'; icon.className = 'bi bi-eye'; }
+    });
+
+    //  Password strength meter 
+    document.getElementById('password').addEventListener('input', function () {
+      const v    = this.value;
+      const fill = document.getElementById('pwStrengthFill');
+      const hint = document.getElementById('pwHint');
+      let score  = 0;
+      if (v.length >= 6)  score++;
+      if (v.length >= 10) score++;
+      if (/[A-Z]/.test(v)) score++;
+      if (/[0-9]/.test(v)) score++;
+      if (/[^A-Za-z0-9]/.test(v)) score++;
+      const levels = [
+        { w:'0%',   bg:'#e8ebf2', txt:'' },
+        { w:'25%',  bg:'#ef4444', txt:'Too short' },
+        { w:'50%',  bg:'#f59e0b', txt:'Fair' },
+        { w:'75%',  bg:'#3b82f6', txt:'Good' },
+        { w:'100%', bg:'#10b981', txt:'Strong' },
+      ];
+      const lvl = levels[Math.min(score, 4)];
+      fill.style.width      = lvl.w;
+      fill.style.background = lvl.bg;
+      hint.textContent      = lvl.txt || 'Minimum 6 characters';
+      hint.style.color      = lvl.bg === '#e8ebf2' ? '#a0aab4' : lvl.bg;
+    });
+
+    //  Form submission 
+    document.getElementById('registerForm').addEventListener('submit', async e => {
       e.preventDefault();
-      fetch('/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: document.getElementById('username').value,
-          password: document.getElementById('password').value
-        })
-      })
-      .then(res => {
-        if (res.status === 201) return res.json();
-        if (res.status === 409) throw new Error('Username already taken');
-        throw new Error('Registration failed');
-      })
-      .then(() => {
-        alert('Registered successfully! Please log in.');
-        location.href = '/';
-      })
-      .catch(err => alert(err.message));
+      const alertEl   = document.getElementById('regAlert');
+      const msgEl     = document.getElementById('regAlertMsg');
+      const successEl = document.getElementById('regSuccess');
+      const btnTxt    = document.getElementById('regBtnText');
+      const btnSp     = document.getElementById('regBtnSpinner');
+      const btn       = document.getElementById('regBtn');
+      const username  = document.getElementById('username').value.trim();
+      const password  = document.getElementById('password').value;
+      const confirm   = document.getElementById('confirmPassword').value;
+      const cfFб      = document.getElementById('confirmFeedback');
+
+      alertEl.style.display = 'none';
+      successEl.style.display = 'none';
+      cfFб.style.display = 'none';
+
+      // Client-side validation
+      if (password !== confirm) {
+        cfFб.textContent = 'Passwords do not match.';
+        cfFб.style.display = 'block';
+        document.getElementById('confirmPassword').classList.add('is-invalid');
+        return;
+      }
+      document.getElementById('confirmPassword').classList.remove('is-invalid');
+
+      btnTxt.classList.add('d-none'); btnSp.classList.remove('d-none'); btn.disabled = true;
+      try {
+        const res  = await fetch('/register', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        if (res.status === 201) {
+          successEl.style.display = 'flex';
+          setTimeout(() => location.href = '/', 1600);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          const errs = { 409: 'Username is already taken.', 400: 'Username and password are required.' };
+          msgEl.textContent = errs[res.status] || data.msg || 'Registration failed.';
+          alertEl.style.display = 'flex';
+        }
+      } catch (_) {
+        msgEl.textContent = 'Network error. Please try again.';
+        alertEl.style.display = 'flex';
+      } finally {
+        btnTxt.classList.remove('d-none'); btnSp.classList.add('d-none'); btn.disabled = false;
+      }
+    });
+
+    //  Clear confirm-error on re-type 
+    document.getElementById('confirmPassword').addEventListener('input', function () {
+      this.classList.remove('is-invalid');
+      document.getElementById('confirmFeedback').style.display = 'none';
     });
   </script>
 </body>

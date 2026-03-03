@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% block title %}Blockchain Ledger – SINEMA{% endblock %}
+
+{% block head %}
+<style>
+  /* ── page header banner ──────────────────────────────────────────── */
+  .chain-hero {
+    background: linear-gradient(135deg,#1b2a4a 0%,#1e3a6e 60%,#0f4a3a 100%);
+    border-radius: 14px;
+    padding: 1.6rem 2rem;
+    margin-bottom: 1.5rem;
+    color: #fff;
+  }
+  .chain-hero h4 { font-weight: 700; margin-bottom: .3rem; }
+  .chain-hero p   { color: rgba(255,255,255,.7); font-size: .87rem; margin-bottom: 0; }
+
+  /* ── stats row ──────────────────────────────────────────────────── */
+  .stat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,.85);
+    border: 1.5px solid #e5e7eb;
+    border-radius: 50px;
+    padding: .45rem 1.1rem;
+    font-size: .85rem;
+    font-weight: 600;
+    box-shadow: 0 1px 6px rgba(0,0,0,.07);
+  }
+
+  /* ── chain layout ────────────────────────────────────────────────── */
+  .chain-wrapper {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+    gap: 0;
+    scrollbar-width: thin;
+  }
+  .chain-wrapper::-webkit-scrollbar { height:6px; }
+  .chain-wrapper::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:4px; }
+
+  /* connector arrow between blocks */
+  .chain-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    font-size: 1.4rem;
+    color: #94a3b8;
+    flex-shrink: 0;
+  }
+
+  /* individual block card */
+  .block-card {
+    flex-shrink: 0;
+    width: 270px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.1);
+    border: 2px solid #dee2e6;
+    font-size: .78rem;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .block-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,.15);
+  }
+  .block-card.genesis  { border-color: #0d6efd; }
+  .block-card.insert   { border-color: #198754; }
+  .block-card.update   { border-color: #ffc107; }
+  .block-card.delete   { border-color: #dc3545; }
+
+  .block-card .card-header {
+    font-weight: 700;
+    font-size: .84rem;
+    border-radius: 10px 10px 0 0;
+    border-bottom: 1px solid rgba(0,0,0,.07);
+  }
+  .block-card.genesis  .card-header { background: linear-gradient(90deg,#dbeafe,#bfdbfe); color:#1e40af; }
+  .block-card.insert   .card-header { background: linear-gradient(90deg,#dcfce7,#bbf7d0); color:#166534; }
+  .block-card.update   .card-header { background: linear-gradient(90deg,#fef9c3,#fef08a); color:#92400e; }
+  .block-card.delete   .card-header { background: linear-gradient(90deg,#fee2e2,#fecaca); color:#991b1b; }
+
+  .block-card .hash-val {
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+    font-size: .7rem;
+    background: #f1f5f9;
+    padding: 2px 5px;
+    border-radius: 4px;
+    color: #475569;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Banner -->
+<div class="chain-hero">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+      <h4 class="mb-1"><i class="bi bi-link-45deg me-2"></i>Annotation Blockchain Ledger</h4>
+      <p>Nakamoto-style Proof-of-Work &bull; Difficulty&nbsp;2 &mdash; hash prefix&nbsp;<code style="color:#93c5fd;">00…</code>&nbsp;&bull; SHA-256</p>
+    </div>
+    <button class="btn btn-sm" onclick="loadChain()"
+            style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.3);border-radius:8px;">
+      <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="d-flex flex-wrap gap-3 mb-3">
+  <div class="stat-pill" id="stat-length">
+    <i class="bi bi-boxes text-primary"></i><span>Blocks: –</span>
+  </div>
+  <div class="stat-pill" id="stat-valid">
+    <i class="bi bi-shield text-secondary"></i><span>Checking…</span>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <span class="badge rounded-pill" style="background:#1e40af;font-size:.78rem;"><i class="bi bi-hexagon-fill me-1"></i>Genesis</span>
+  <span class="badge rounded-pill bg-success" style="font-size:.78rem;"><i class="bi bi-plus-circle me-1"></i>INSERT</span>
+  <span class="badge rounded-pill bg-warning text-dark" style="font-size:.78rem;"><i class="bi bi-pencil me-1"></i>UPDATE</span>
+  <span class="badge rounded-pill bg-danger" style="font-size:.78rem;"><i class="bi bi-trash3 me-1"></i>DELETE</span>
+</div>
+
+<!-- Chain view -->
+<div class="card">
+  <div class="card-body" style="padding:1.25rem;">
+    <div id="chain-container" class="chain-wrapper">
+      <div class="text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Loading chain…</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TOKEN = localStorage.getItem('token');
+
+function fmtDate(ts) {
+  return new Date(ts * 1000).toLocaleString();
+}
+
+function actionClass(action) {
+  if (!action) return '';
+  return action.toLowerCase();
+}
+
+function buildBlock(b) {
+  const action  = b.data.action || 'GENESIS';
+  const cls     = actionClass(action);
+  const annId   = b.data.annotation_id
+                    ? `<tr><td><b>Ann.&nbsp;ID</b></td><td class="hash-val">${b.data.annotation_id}</td></tr>` : '';
+
+  // payload rows (if present)
+  let payloadRows = '';
+  const p = b.data.payload;
+  if (p) {
+    const fields = ['name','occurrence_location','occurrence_date','area_condition',
+                    'landslide_condition','landslide_impact','causative_factor','mechanism'];
+    for (const f of fields) {
+      if (p[f] != null) {
+        const label = f.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+        payloadRows += `<tr><td><b>${label}</b></td><td>${p[f]}</td></tr>`;
+      }
+    }
+  }
+
+  return `
+  <div class="card block-card ${cls}">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>#${b.index} &mdash; ${action}</span>
+      <small class="text-muted">${fmtDate(b.timestamp)}</small>
+    </div>
+    <div class="card-body p-2">
+      <table class="table table-sm table-borderless mb-1">
+        <tbody>
+          <tr><td><b>Nonce</b></td><td>${b.nonce}</td></tr>
+          ${annId}
+          ${payloadRows}
+          <tr>
+            <td><b>Prev&nbsp;hash</b></td>
+            <td class="hash-val">${b.previous_hash.substring(0,20)}…</td>
+          </tr>
+          <tr>
+            <td><b>Hash</b></td>
+            <td class="hash-val text-success fw-bold">${b.hash.substring(0,20)}…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+async function loadChain() {
+  document.getElementById('chain-container').innerHTML = '<div class="text-muted">Loading…</div>';
+  try {
+    const res = await fetch('/blockchain_chain', {
+      headers: { Authorization: 'Bearer ' + TOKEN }
+    });
+    if (!res.ok) {
+      document.getElementById('chain-container').innerHTML =
+        `<div class="alert alert-danger">Failed to fetch chain (${res.status}).</div>`;
+      return;
+    }
+    const json = await res.json();
+
+    // stats
+    document.getElementById('stat-length').innerHTML =
+      `<i class="bi bi-boxes text-primary"></i><span>Blocks: ${json.length}</span>`;
+    const valEl = document.getElementById('stat-valid');
+    if (json.valid) {
+      valEl.innerHTML = `<i class="bi bi-shield-check text-success"></i><span style="color:#166534;">Chain intact</span>`;
+    } else {
+      valEl.innerHTML = `<i class="bi bi-shield-exclamation text-danger"></i><span style="color:#991b1b;">Chain INVALID</span>`;
+    }
+
+    if (!json.chain || json.chain.length === 0) {
+      document.getElementById('chain-container').innerHTML =
+        '<div class="text-muted py-2"><i class="bi bi-info-circle me-2"></i>No blocks yet. Create, update, or delete an annotation to mint the first block.</div>';
+      return;
+    }
+
+    // render blocks with arrows
+    let html = '';
+    json.chain.forEach((b, i) => {
+      html += buildBlock(b);
+      if (i < json.chain.length - 1) {
+        html += '<div class="chain-arrow">→</div>';
+      }
+    });
+    document.getElementById('chain-container').innerHTML = html;
+  } catch (err) {
+    document.getElementById('chain-container').innerHTML =
+      `<div class="alert alert-danger">Error: ${err.message}</div>`;
+  }
+}
+
+// auto-load on page ready
+loadChain();
+</script>
+{% endblock %}
